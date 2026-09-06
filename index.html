@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Smart Payments | M-Pesa</title>
+        <link rel="stylesheet" href="style.css">
+        </head>
+
+        <body>
+
+          <header class="header">
+              <div class="logo">Smart Payments</div>
+                  <div class="secure">🔒 Secure Payment</div>
+                    </header>
+
+                      <main class="container">
+
+                          <section class="payment-card">
+
+                                <div class="mpesa-icon">M</div>
+
+                                      <h1>Pay with M-Pesa</h1>
+
+                                            <p class="subtitle">
+                                                    Enter your details below to receive an M-Pesa payment prompt.
+                                                          </p>
+
+                                                                <form id="paymentForm">
+
+                                                                        <label for="phone">M-Pesa Phone Number</label>
+
+                                                                                <input
+                                                                                          type="tel"
+                                                                                                    id="phone"
+                                                                                                              name="phone"
+                                                                                                                        placeholder="07XXXXXXXX"
+                                                                                                                                  inputmode="numeric"
+                                                                                                                                            maxlength="12"
+                                                                                                                                                      required
+                                                                                                                                                              >
+
+                                                                                                                                                                      <label for="amount">Amount (KES)</label>
+
+                                                                                                                                                                              <input
+                                                                                                                                                                                        type="number"
+                                                                                                                                                                                                  id="amount"
+                                                                                                                                                                                                            name="amount"
+                                                                                                                                                                                                                      placeholder="Enter amount"
+                                                                                                                                                                                                                                min="1"
+                                                                                                                                                                                                                                          step="1"
+                                                                                                                                                                                                                                                    required
+                                                                                                                                                                                                                                                            >
+
+                                                                                                                                                                                                                                                                    <button type="submit" id="payButton">
+                                                                                                                                                                                                                                                                              Pay with M-Pesa
+                                                                                                                                                                                                                                                                                      </button>
+
+                                                                                                                                                                                                                                                                                            </form>
+
+                                                                                                                                                                                                                                                                                                  <div id="message" class="message"></div>
+
+                                                                                                                                                                                                                                                                                                        <div class="notice">
+                                                                                                                                                                                                                                                                                                                <strong>Important:</strong>
+                                                                                                                                                                                                                                                                                                                        Your M-Pesa PIN is entered only on the official M-Pesa
+                                                                                                                                                                                                                                                                                                                                payment prompt on your phone. We never ask for your PIN.
+                                                                                                                                                                                                                                                                                                                                      </div>
+
+                                                                                                                                                                                                                                                                                                                                          </section>
+
+                                                                                                                                                                                                                                                                                                                                            </main>
+
+                                                                                                                                                                                                                                                                                                                                              <footer>
+                                                                                                                                                                                                                                                                                                                                                  <p>© 2026 Smart Payments</p>
+                                                                                                                                                                                                                                                                                                                                                      <p>Secure M-Pesa payment service</p>
+                                                                                                                                                                                                                                                                                                                                                        </footer>
+
+                                                                                                                                                                                                                                                                                                                                                          <script src="script.js"></script>
+
+                                                                                                                                                                                                                                                                                                                                                          </body>
+                                                                                                                                                                                                                                                                                                                                                          </html>
