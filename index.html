@@ -9,97 +9,112 @@
 
 <body>
 
-  <header>
-    <div class="header-content">
-      <div class="brand">
-        <div class="logo">M</div>
-        <div>
-          <h1>Smart Payments</h1>
-          <span>Secure Payment</span>
-        </div>
+<header>
+  <div class="header-content">
+    <div class="brand">
+      <div class="logo">M</div>
+      <div>
+        <h1>Smart Payments</h1>
+        <span>Secure M-Pesa Payment</span>
       </div>
     </div>
-  </header>
+  </div>
+</header>
 
-  <main class="container">
+<main class="container">
 
-    <section class="payment-card">
+  <section class="payment-card">
 
-      <div class="card-top">
-        <div class="secure-icon">✓</div>
-        <div>
-          <h2>Make a Payment</h2>
-          <p>Enter the amount you want to pay.</p>
-        </div>
-      </div>
-
-      <div class="payment-summary">
-        <div class="summary-row">
-          <span>Payment method</span>
-          <strong>Pochi la Biashara</strong>
-        </div>
-
-        <div class="summary-row">
-          <span>Recipient</span>
-          <strong>0799942997</strong>
-        </div>
-
-        <div class="summary-row">
-          <span>Reference</span>
-          <strong id="paymentReference">SP-PENDING</strong>
-        </div>
-      </div>
-
-      <form id="paymentForm">
-
-        <label for="amount">Payment Amount</label>
-
-        <div class="amount-box">
-          <span>KES</span>
-          <input
-            type="number"
-            id="amount"
-            min="1"
-            step="1"
-            placeholder="Enter amount"
-            required
-          >
-        </div>
-
-        <button type="submit" id="payButton">
-          Show Payment Instructions
-        </button>
-
-      </form>
-
-      <div id="message" class="message"></div>
-
-      <div class="security-box">
-        <strong>🔒 Security reminder</strong>
-        <p>
-          Your M-Pesa PIN is entered only inside the official M-Pesa
-          payment prompt. Smart Payments will never ask for your PIN.
-        </p>
-      </div>
-
-    </section>
-
-    <section class="status-card">
-      <div class="status-dot"></div>
+    <div class="card-top">
+      <div class="secure-icon">✓</div>
       <div>
-        <strong>Payment status</strong>
-        <p id="paymentStatus">Waiting for payment instructions</p>
+        <h2>Make a Payment</h2>
+        <p>Enter your M-Pesa number and payment amount.</p>
       </div>
-    </section>
+    </div>
 
-  </main>
+    <div class="payment-summary">
+      <div class="summary-row">
+        <span>Payment method</span>
+        <strong>M-Pesa STK Push</strong>
+      </div>
 
-  <footer>
-    <p>© 2026 Smart Payments</p>
-    <span>Secure M-Pesa payment service</span>
-  </footer>
+      <div class="summary-row">
+        <span>Payment account</span>
+        <strong>Secure business account</strong>
+      </div>
 
-  <script src="script.js"></script>
+      <div class="summary-row">
+        <span>Reference</span>
+        <strong id="paymentReference">SP-PENDING</strong>
+      </div>
+    </div>
+
+    <form id="paymentForm">
+
+      <label for="phone">M-Pesa Phone Number</label>
+
+      <div class="amount-box">
+        <span>+254</span>
+        <input
+          type="tel"
+          id="phone"
+          inputmode="numeric"
+          autocomplete="tel"
+          placeholder="712345678"
+          maxlength="9"
+          required
+        >
+      </div>
+
+      <label for="amount">Payment Amount</label>
+
+      <div class="amount-box">
+        <span>KES</span>
+        <input
+          type="number"
+          id="amount"
+          min="1"
+          step="1"
+          placeholder="Enter amount"
+          required
+        >
+      </div>
+
+      <button type="submit" id="payButton">
+        Pay with M-Pesa
+      </button>
+
+    </form>
+
+    <div id="message" class="message"></div>
+
+    <div class="security-box">
+      <strong>🔒 Security reminder</strong>
+      <p>
+        Your M-Pesa PIN is entered only inside the official M-Pesa
+        payment prompt. Smart Payments will never ask for your PIN.
+      </p>
+    </div>
+
+  </section>
+
+  <section class="status-card">
+    <div class="status-dot"></div>
+    <div>
+      <strong>Payment status</strong>
+      <p id="paymentStatus">Waiting for payment</p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>© 2026 Smart Payments</p>
+  <span>Secure M-Pesa payment service</span>
+</footer>
+
+<script src="script.js"></script>
 
 </body>
 </html>
