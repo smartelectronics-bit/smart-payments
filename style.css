@@ -155,4 +155,9 @@
                                                                                                                                                                                                         padding: 25px 20px;
                                                                                                                                                                                                           }
                                                                                                                                                                                                           
-}
+}header{background:#087f23!important;color:white!important;padding:18px 20px!important}
+.header-content{max-width:520px!important;margin:auto!important}
+.brand{display:flex!important;align-items:center!important;gap:12px!important}
+.logo{width:46px!important;height:46px!important;border-radius:50%!important;background:white!important;color:#087f23!important;display:flex!important;align-items:center!important;justify-content:center!important;font-size:24px!important;font-weight:bold!important;flex-shrink:0!important}
+.brand h1{margin:0!important;font-size:20px!important;color:white!important}
+.brand span{font-size:13px!important;color:white!important;opacity:.9!important}

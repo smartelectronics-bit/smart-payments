@@ -2,6 +2,8 @@ const form = document.getElementById("paymentForm");
 const amountInput = document.getElementById("amount");
 const button = document.getElementById("payButton");
 const message = document.getElementById("message");
+const paymentReference = document.getElementById("paymentReference");
+const paymentStatus = document.getElementById("paymentStatus");
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -15,13 +17,22 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
+  const reference =
+    "SP-" +
+    Date.now().toString().slice(-8);
+
+  paymentReference.textContent = reference;
+  paymentStatus.textContent = "Payment pending — follow the instructions below.";
+
   button.disabled = true;
   button.textContent = "Instructions Ready";
 
   message.style.color = "#087f23";
 
   message.innerHTML =
-    "<strong>Payment ready: KES " + amount + "</strong><br><br>" +
+    "<strong>Payment ready: KES " + amount + "</strong><br>" +
+    "<small>Reference: <strong>" + reference + "</strong></small><br><br>" +
+
     "<div style='text-align:left;line-height:1.8'>" +
     "1. Open the M-Pesa app.<br>" +
     "2. Tap <strong>Pay</strong> or <strong>Transact</strong>.<br>" +
@@ -31,6 +42,7 @@ form.addEventListener("submit", (event) => {
     "6. Confirm the payment.<br>" +
     "7. Enter your M-Pesa PIN <strong>only inside M-Pesa</strong>." +
     "</div><br>" +
+
     "<button type='button' id='copyNumber'>Copy M-Pesa Number</button>";
 
   document.getElementById("copyNumber").onclick = async function () {
