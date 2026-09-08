@@ -6,41 +6,153 @@ const message = document.getElementById("message");
 const paymentReference = document.getElementById("paymentReference");
 const paymentStatus = document.getElementById("paymentStatus");
 
+let statusTimer = null;
+
+function setMessage(text, type = "info") {
+  message.textContent = text;
+
+  if (type === "error") {
+    message.style.color = "#b00020";
+  } else if (type === "success") {
+    message.style.color = "#087f23";
+  } else {
+    message.style.color = "";
+  }
+}
+
+function setStatus(text) {
+  paymentStatus.textContent = text;
+}
+
+function stopStatusPolling() {
+  if (statusTimer) {
+    clearInterval(statusTimer);
+    statusTimer = null;
+  }
+}
+
+async function checkPaymentStatus(checkoutRequestId) {
+  try {
+    const response = await fetch(
+      `/api/payment/${encodeURIComponent(checkoutRequestId)}`
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      return;
+    }
+
+    const payment = data.payment;
+
+    if (payment.status === "PAID") {
+      stopStatusPolling();
+
+      setStatus("Payment successful ✅");
+
+      setMessage(
+        "Payment received successfully. Thank you!",
+        "success"
+      );
+
+      button.disabled = false;
+      button.textContent = "Pay with M-Pesa";
+
+      if (payment.mpesaReceiptNumber) {
+        setMessage(
+          `Payment received successfully. M-Pesa receipt: ${payment.mpesaReceiptNumber}`,
+          "success"
+        );
+      }
+
+      return;
+    }
+
+    if (payment.status === "FAILED") {
+      stopStatusPolling();
+
+      setStatus("Payment failed ❌");
+
+      setMessage(
+        payment.resultDescription ||
+          "The M-Pesa payment was not completed.",
+        "error"
+      );
+
+      button.disabled = false;
+      button.textContent = "Try Again";
+
+      return;
+    }
+
+    setStatus("Waiting for payment ⏳");
+  } catch (error) {
+    console.error("Payment status error:", error);
+  }
+}
+
+function startStatusPolling(checkoutRequestId) {
+  stopStatusPolling();
+
+  let attempts = 0;
+  const maxAttempts = 60;
+
+  setStatus("Waiting for payment ⏳");
+
+  statusTimer = setInterval(async () => {
+    attempts++;
+
+    await checkPaymentStatus(checkoutRequestId);
+
+    if (attempts >= maxAttempts) {
+      stopStatusPolling();
+
+      setStatus("Payment status timed out");
+
+      setMessage(
+        "We could not confirm the payment yet. Please check your M-Pesa messages before trying again.",
+        "error"
+      );
+
+      button.disabled = false;
+      button.textContent = "Pay with M-Pesa";
+    }
+  }, 2000);
+}
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+
+  stopStatusPolling();
 
   const phoneDigits = phoneInput.value.replace(/\D/g, "");
   const amount = Number(amountInput.value);
 
   if (!/^7\d{8}$/.test(phoneDigits)) {
-    message.style.color = "#b00020";
-    message.innerHTML =
-      "<strong>Enter a valid M-Pesa number.</strong><br>" +
-      "Use a number such as 712345678.";
+    setMessage(
+      "Enter a valid M-Pesa number. Use a number such as 712345678.",
+      "error"
+    );
     return;
   }
 
   if (!Number.isInteger(amount) || amount < 1) {
-    message.style.color = "#b00020";
-    message.innerHTML =
-      "<strong>Enter a valid amount.</strong><br>" +
-      "The minimum payment is KES 1.";
+    setMessage(
+      "Enter a valid amount. The minimum payment is KES 1.",
+      "error"
+    );
     return;
   }
 
   const phone = "254" + phoneDigits;
 
-  const reference =
-    "SP-" + Date.now().toString().slice(-8);
-
-  paymentReference.textContent = reference;
-  paymentStatus.textContent = "Sending M-Pesa payment prompt...";
-
   button.disabled = true;
-  button.textContent = "Sending Prompt...";
+  button.textContent = "Sending...";
 
-  message.style.color = "#087f23";
-  message.innerHTML = "Connecting securely to M-Pesa...";
+  setMessage("Starting M-Pesa payment...");
+  setStatus("Preparing payment ⏳");
+
+  paymentReference.textContent = "Creating payment...";
 
   try {
     const response = await fetch("/api/stkpush", {
@@ -49,45 +161,51 @@ form.addEventListener("submit", async (event) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        phone: phone,
-        amount: amount
+        phone,
+        amount
       })
     });
 
-    const result = await response.json();
+    const data = await response.json();
 
-    if (!response.ok || !result.success) {
+    if (!response.ok || !data.success) {
       throw new Error(
-        result.message || "Unable to start the M-Pesa payment."
+        data.message || "Could not start the M-Pesa payment."
       );
     }
 
-    paymentStatus.textContent =
-      "M-Pesa prompt sent — complete the payment on your phone.";
+    paymentReference.textContent =
+      data.reference || "SP-PENDING";
 
-    message.style.color = "#087f23";
+    setMessage(
+      "M-Pesa prompt sent. Check your phone and enter your M-Pesa PIN."
+    );
 
-    message.innerHTML =
-      "<strong>Payment prompt sent ✓</strong><br><br>" +
-      "A KES " + amount + " M-Pesa payment prompt has been sent to " +
-      "<strong>+254" + phoneDigits + "</strong>.<br><br>" +
-      "Check your phone and complete the payment in the official M-Pesa prompt.<br><br>" +
-      "<small>Reference: <strong>" + reference + "</strong></small><br><br>" +
-      "<strong>🔒 Never enter your M-Pesa PIN on this website.</strong>";
+    setStatus("Waiting for payment ⏳");
 
-    button.textContent = "Prompt Sent ✓";
+    button.textContent = "Waiting...";
+
+    if (data.checkoutRequestId) {
+      startStatusPolling(data.checkoutRequestId);
+    } else {
+      throw new Error(
+        "M-Pesa did not return a payment reference."
+      );
+    }
 
   } catch (error) {
+    console.error(error);
 
-    paymentStatus.textContent = "Payment could not be started.";
+    stopStatusPolling();
 
-    message.style.color = "#b00020";
+    setMessage(
+      error.message || "Unable to start payment.",
+      "error"
+    );
 
-    message.innerHTML =
-      "<strong>Payment could not be started.</strong><br>" +
-      (error.message || "Please try again.");
+    setStatus("Payment not started");
 
     button.disabled = false;
-    button.textContent = "Pay with M-Pesa";
+    button.textContent = "Try Again";
   }
 });
