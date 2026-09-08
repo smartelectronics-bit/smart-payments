@@ -5,21 +5,33 @@ const express = require("express");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Temporary transaction storage.
+// We will replace this with a real database before production.
+const payments = new Map();
+
 app.use(express.json());
 app.use(express.static(__dirname));
 
 function normalizePhone(phone) {
-  let value = String(phone || "").replace(/\D/g, "");
+  const value = String(phone || "").replace(/\s+/g, "");
 
-  if (value.startsWith("0")) {
-    value = "254" + value.slice(1);
+  if (/^07\d{8}$/.test(value)) {
+    return "254" + value.slice(1);
   }
 
-  if (value.startsWith("+254")) {
-    value = value.slice(1);
+  if (/^01\d{8}$/.test(value)) {
+    return "254" + value.slice(1);
   }
 
-  return value;
+  if (/^254[17]\d{8}$/.test(value)) {
+    return value;
+  }
+
+  return null;
+}
+
+function generateReference() {
+  return "SP-" + Date.now().toString().slice(-8);
 }
 
 app.get("/api/health", (req, res) => {
@@ -31,37 +43,28 @@ app.get("/api/health", (req, res) => {
 
 app.post("/api/stkpush", async (req, res) => {
   try {
-    const { phone, amount } = req.body;
+    const phone = normalizePhone(req.body.phone);
+    const amount = Number(req.body.amount);
 
-    if (!phone || !amount) {
-      return res.status(400).json({
-        success: false,
-        message: "Phone number and amount are required."
-      });
-    }
-
-    const phoneNumber = normalizePhone(phone);
-    const paymentAmount = Number(amount);
-
-    if (!/^2547\d{8}$/.test(phoneNumber)) {
+    if (!phone) {
       return res.status(400).json({
         success: false,
         message: "Enter a valid Kenyan M-Pesa phone number."
       });
     }
 
-    if (!Number.isFinite(paymentAmount) || paymentAmount < 1) {
+    if (!Number.isInteger(amount) || amount < 1) {
       return res.status(400).json({
         success: false,
-        message: "Enter a valid payment amount."
+        message: "Amount must be a whole number greater than zero."
       });
     }
 
     const {
       MPESA_CONSUMER_KEY,
       MPESA_CONSUMER_SECRET,
-      MPESA_SHORTCODE,
       MPESA_PASSKEY,
+      MPESA_SHORTCODE,
       MPESA_BASE_URL,
       MPESA_CALLBACK_URL,
       MPESA_ACCOUNT_REFERENCE
@@ -70,29 +73,27 @@ app.post("/api/stkpush", async (req, res) => {
     if (
       !MPESA_CONSUMER_KEY ||
       !MPESA_CONSUMER_SECRET ||
-      !MPESA_SHORTCODE ||
       !MPESA_PASSKEY ||
+      !MPESA_SHORTCODE ||
+      !MPESA_BASE_URL ||
       !MPESA_CALLBACK_URL
     ) {
       return res.status(500).json({
         success: false,
-        message: "Daraja configuration is incomplete. Check the .env file."
+        message: "M-Pesa server configuration is incomplete."
       });
     }
 
-    const baseUrl =
-      MPESA_BASE_URL || "https://sandbox.safaricom.co.ke";
-
+    // 1. Get OAuth access token
     const auth = Buffer.from(
-      MPESA_CONSUMER_KEY + ":" + MPESA_CONSUMER_SECRET
+      `${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`
     ).toString("base64");
 
     const tokenResponse = await fetch(
-      baseUrl + "/oauth/v1/generate?grant_type=client_credentials",
+      `${MPESA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
       {
-        method: "GET",
         headers: {
-          Authorization: "Basic " + auth
+          Authorization: `Basic ${auth}`
         }
       }
     );
@@ -100,86 +101,208 @@ app.post("/api/stkpush", async (req, res) => {
     const tokenData = await tokenResponse.json();
 
     if (!tokenResponse.ok || !tokenData.access_token) {
+      console.error("OAuth error:", tokenData);
+
       return res.status(502).json({
         success: false,
-        message: "Could not connect to the M-Pesa service."
+        message: "Could not connect to M-Pesa."
       });
     }
 
-    const now = new Date();
-
-    const timestamp =
-      now.getFullYear().toString() +
-      String(now.getMonth() + 1).padStart(2, "0") +
-      String(now.getDate()).padStart(2, "0") +
-      String(now.getHours()).padStart(2, "0") +
-      String(now.getMinutes()).padStart(2, "0") +
-      String(now.getSeconds()).padStart(2, "0");
+    // 2. Create timestamp and password
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[-:TZ.]/g, "")
+      .slice(0, 14);
 
     const password = Buffer.from(
-      MPESA_SHORTCODE + MPESA_PASSKEY + timestamp
+      `${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp}`
     ).toString("base64");
 
-    const stkPayload = {
-      BusinessShortCode: MPESA_SHORTCODE,
-      Password: password,
-      Timestamp: timestamp,
-      TransactionType: "CustomerPayBillOnline",
-      Amount: Math.round(paymentAmount),
-      PartyA: phoneNumber,
-      PartyB: MPESA_SHORTCODE,
-      PhoneNumber: phoneNumber,
-      CallBackURL: MPESA_CALLBACK_URL,
-      AccountReference: MPESA_ACCOUNT_REFERENCE || "SmartPayments",
-      TransactionDesc: "Smart Payments"
-    };
+    const reference =
+      MPESA_ACCOUNT_REFERENCE || generateReference();
 
+    // 3. Send STK Push
     const stkResponse = await fetch(
-      baseUrl + "/mpesa/stkpush/v1/processrequest",
+      `${MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest`,
       {
         method: "POST",
         headers: {
-          Authorization: "Bearer " + tokenData.access_token,
+          Authorization: `Bearer ${tokenData.access_token}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(stkPayload)
+        body: JSON.stringify({
+          BusinessShortCode: MPESA_SHORTCODE,
+          Password: password,
+          Timestamp: timestamp,
+          TransactionType: "CustomerPayBillOnline",
+          Amount: amount,
+          PartyA: phone,
+          PartyB: MPESA_SHORTCODE,
+          PhoneNumber: phone,
+          CallBackURL: MPESA_CALLBACK_URL,
+          AccountReference: reference,
+          TransactionDesc: "Smart Payments"
+        })
       }
     );
 
     const stkData = await stkResponse.json();
 
-    if (!stkResponse.ok) {
+    console.log("STK response:", stkData);
+
+    if (
+      !stkResponse.ok ||
+      String(stkData.ResponseCode) !== "0"
+    ) {
       return res.status(502).json({
         success: false,
-        message: "M-Pesa STK Push request failed."
+        message:
+          stkData.ResponseDescription ||
+          stkData.errorMessage ||
+          "M-Pesa STK request failed."
       });
     }
 
-    res.json({
+    // 4. Save the transaction as PENDING
+    if (stkData.CheckoutRequestID) {
+      payments.set(stkData.CheckoutRequestID, {
+        status: "PENDING",
+        phone,
+        amount,
+        reference,
+        merchantRequestId: stkData.MerchantRequestID,
+        checkoutRequestId: stkData.CheckoutRequestID,
+        createdAt: Date.now()
+      });
+    }
+
+    return res.json({
       success: true,
-      message: "M-Pesa prompt sent. Check your phone and enter your PIN there.",
-      data: stkData
+      message: "Payment prompt sent to your phone.",
+      reference,
+      merchantRequestId: stkData.MerchantRequestID,
+      checkoutRequestId: stkData.CheckoutRequestID
     });
 
   } catch (error) {
-    console.error("STK Push error:", error);
+    console.error("STK error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: "Something went wrong while starting the payment."
+      message: "Unable to start payment."
     });
   }
 });
 
-app.post("/api/mpesa/callback", (req, res) => {
-  console.log("M-Pesa callback received:", JSON.stringify(req.body, null, 2));
+// Check payment status
+app.get("/api/payment/:checkoutRequestId", (req, res) => {
+  const payment = payments.get(req.params.checkoutRequestId);
+
+  if (!payment) {
+    return res.status(404).json({
+      success: false,
+      message: "Payment not found."
+    });
+  }
 
   res.json({
-    ResultCode: 0,
-    ResultDesc: "Accepted"
+    success: true,
+    payment
   });
 });
 
+// M-Pesa callback
+app.post("/api/mpesa/callback", (req, res) => {
+  try {
+    console.log(
+      "M-Pesa callback:",
+      JSON.stringify(req.body, null, 2)
+    );
+
+    const callback = req.body?.Body?.stkCallback;
+
+    if (!callback) {
+      return res.json({
+        ResultCode: 0,
+        ResultDesc: "Accepted"
+      });
+    }
+
+    const checkoutRequestId = callback.CheckoutRequestID;
+    const resultCode = Number(callback.ResultCode);
+
+    const payment = payments.get(checkoutRequestId);
+
+    if (payment) {
+      if (resultCode === 0) {
+        const metadata =
+          callback.CallbackMetadata?.Item || [];
+
+        const getMetadata = (name) => {
+          const item = metadata.find(
+            (entry) => entry.Name === name
+          );
+
+          return item ? item.Value : null;
+        };
+
+        payment.status = "PAID";
+        payment.resultCode = resultCode;
+        payment.resultDescription =
+          callback.ResultDesc || "Payment successful";
+
+        payment.mpesaReceiptNumber =
+          getMetadata("MpesaReceiptNumber");
+
+        payment.paidAmount =
+          getMetadata("Amount");
+
+        payment.paidPhone =
+          getMetadata("PhoneNumber");
+
+        payment.transactionDate =
+          getMetadata("TransactionDate");
+
+        payment.completedAt = Date.now();
+      } else {
+        payment.status = "FAILED";
+        payment.resultCode = resultCode;
+        payment.resultDescription =
+          callback.ResultDesc || "Payment failed";
+
+        payment.completedAt = Date.now();
+      }
+
+      payments.set(checkoutRequestId, payment);
+    }
+
+    return res.json({
+      ResultCode: 0,
+      ResultDesc: "Accepted"
+    });
+
+  } catch (error) {
+    console.error("Callback error:", error);
+
+    return res.json({
+      ResultCode: 0,
+      ResultDesc: "Accepted"
+    });
+  }
+});
+
+// Remove old transactions from memory
+setInterval(() => {
+  const expiry = Date.now() - 30 * 60 * 1000;
+
+  for (const [id, payment] of payments.entries()) {
+    if (payment.createdAt < expiry) {
+      payments.delete(id);
+    }
+  }
+}, 5 * 60 * 1000);
+
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("Smart Payments server running on port " + PORT);
+  console.log(`Smart Payments server running on port ${PORT}`);
 });
